@@ -294,7 +294,7 @@ def load_json(filepath):
 
 if __name__ == "__main__":
     print("==============================================================")
-    print(f"{Fore.CYAN}🟦 Daphne v{VERSION} 🟦{Style.RESET_ALL}")
+    print(f"{Fore.CYAN}🟦 Daphene v{VERSION} 🟦{Style.RESET_ALL}")
     print(f"{Fore.CYAN}🌏 Package Server: {PACKAGE_SERVER}{Style.RESET_ALL}")
     print("==============================================================")
 
