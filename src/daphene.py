@@ -306,5 +306,5 @@ if __name__ == "__main__":
         init_container(args.defaults)
     else:
         print(
-            f"{Fore.RED}❌ Please specify either {Fore.LIGHTBLACK_EX}--build{Fore.RED} or {Fore.LIGHTBLACK_EX}--run{Style.RESET_ALL}"
+            f"{Fore.RED}❌ Please specify either {Fore.LIGHTBLACK_EX}--run{Style.RESET_ALL} or {Fore.LIGHTBLACK_EX}--init{Style.RESET_ALL}"
         )
