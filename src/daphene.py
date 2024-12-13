@@ -2,21 +2,25 @@ import json
 import os
 import platform
 import argparse
-from colorama import Fore, Style
 from uuid import uuid4
 import subprocess
 import shutil
 from pathlib import Path
+import atexit
 
-PACKAGE_SERVER = "http://localhost:8000"
-VERSION = "1.0.0"
+from colorama import Fore, Style
+
+
+def register_cleanup(temp_dir):
+    atexit.register(lambda: clean_temp_dir(temp_dir))
+
+
+VERSION = "1.1.0"
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-r", "--run", help="The container to run", type=str
-    )
+    parser.add_argument("-r", "--run", help="The container to run", type=str)
     parser.add_argument(
         "-i",
         "--init",
@@ -24,7 +28,14 @@ def parse_arguments():
         help="Initialize a new container",
     )
     parser.add_argument(
+        "-t", "--template", help="Template file for container initialization", type=str
+    )
+    parser.add_argument(
         "-d", "--defaults", action="store_true", help="Use default values"
+    )
+    parser.add_argument("-v", "--version", action="version", version=VERSION)
+    parser.add_argument(
+        "-l", "--list", action="store_true", help="List available containers"
     )
     return parser.parse_args()
 
@@ -32,7 +43,9 @@ def parse_arguments():
 def get_temp_dir():
     platform_name = platform.platform().split("-")[0]
     if platform_name == "Windows":
-        return f"C:\\Users\\{os.getlogin()}\\AppData\\Local\\Temp\\daphne-venvs\\{uuid4()}"
+        return (
+            f"C:\\Users\\{os.getlogin()}\\AppData\\Local\\Temp\\daphne-venvs\\{uuid4()}"
+        )
     elif platform_name == "Linux":
         return f"/tmp/{uuid4()}"
     else:
@@ -40,6 +53,21 @@ def get_temp_dir():
             f"{Fore.RED}❌ Unsupported platform: {Fore.LIGHTBLACK_EX}{platform_name}{Style.RESET_ALL}"
         )
         exit(1)
+
+
+def list_containers(base_dir="."):
+    containers = [
+        d
+        for d in os.listdir(base_dir)
+        if os.path.isdir(os.path.join(base_dir, d))
+        and os.path.exists(os.path.join(base_dir, d, ".daphne", "meta.json"))
+    ]
+    if containers:
+        print(f"{Fore.GREEN}Available containers:{Style.RESET_ALL}")
+        for container in containers:
+            print(f" - {container}")
+    else:
+        print(f"{Fore.YELLOW}No containers found in the directory{Style.RESET_ALL}")
 
 
 def run(container, script="start"):
@@ -83,7 +111,7 @@ def run_container(container, is_built=False, script="start"):
             start_script = metadata["scripts"][script]
         except KeyError:
             print(
-                f"{Fore.RED}❌ No such script {Fore.LIGHTBLACK_EX}{script}{Style.RESET_ALL} in container {Fore.LIGHTBLACK_EX}{container}@{metadata['version']}{Style.RESET_ALL}"
+                f"{Fore.RED}❌ No such script {Fore.LIGHTBLACK_EX}{script}{Style.RESET_ALL} in container {Fore.LIGHTBLACK_EX}{container}@{metadata["version"]}{Style.RESET_ALL}"
             )
             exit(1)
 
@@ -91,18 +119,18 @@ def run_container(container, is_built=False, script="start"):
             start_script, container, metadata["name"], env_path
         ):
             print(
-                f"{Fore.RED}❌ Failed to run container {Fore.LIGHTBLACK_EX}{container}@{metadata['version']}{Style.RESET_ALL}"
+                f"{Fore.RED}❌ Failed to run container {Fore.LIGHTBLACK_EX}{container}@{metadata["version"]}{Style.RESET_ALL}"
             )
             exit(1)
 
     except Exception as e:
         print(
-            f"{Fore.RED}❌ Failed to run container {Fore.LIGHTBLACK_EX}{container}@{metadata['version']}{Fore.RED}: {e}{Style.RESET_ALL}"
+            f"{Fore.RED}❌ Failed to run container {Fore.LIGHTBLACK_EX}{container}@{metadata["version"]}{Fore.RED}: {e}{Style.RESET_ALL}"
         )
         exit(1)
 
     print(
-        f"{Fore.GREEN}🎉 Successfully ran container {Fore.LIGHTBLACK_EX}{container}@{metadata['version']}{Style.RESET_ALL}"
+        f"{Fore.GREEN}🎉 Successfully ran container {Fore.LIGHTBLACK_EX}{container}@{metadata["version"]}{Style.RESET_ALL}"
     )
 
 
@@ -114,10 +142,11 @@ def prepare_virtualenv(runs_on, container_dir):
         exit(1)
 
     env_path = Path(get_temp_dir())
+    register_cleanup(env_path)
 
     if env_path.exists():
         shutil.rmtree(env_path)
-    print(f"{Fore.BLUE}♻️  Preparing virtual environment at {env_path}{Style.RESET_ALL}")
+    print(f"{Fore.BLUE}♻️  Creating virtual environment{Style.RESET_ALL}")
 
     try:
         subprocess.run(
@@ -126,9 +155,7 @@ def prepare_virtualenv(runs_on, container_dir):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        print(
-            f"{Fore.GREEN}✅ Virtual environment created at {env_path}{Style.RESET_ALL}"
-        )
+        print(f"{Fore.GREEN}✅ Virtual environment created{Style.RESET_ALL}")
 
         subprocess.run(
             ["cp", "-r", f"{container_dir}/.", str(env_path)],
@@ -163,19 +190,21 @@ def run_script_in_virtualenv(script, path, container_name, env_path):
                 stderr=subprocess.PIPE,
             )
             print(
-                f"{Fore.GREEN}✅ Installed dependencies in virtual environment{Style.RESET_ALL}"
+                f"{Fore.GREEN}✅ Installed dependencies in virtual environment for {Fore.LIGHTBLACK_EX}{container_name}{Style.RESET_ALL}"
             )
         except Exception as e:
-            print(f"{Fore.RED}❌ Failed to install dependencies: {e}{Style.RESET_ALL}")
+            print(
+                f"{Fore.RED}❌ Failed to install dependencies in virtual environment for {Fore.LIGHTBLACK_EX}{container_name}{Fore.RED}: {e}{Style.RESET_ALL}"
+            )
             exit(1)
 
     os.chdir(env_path)
 
-    command = f"{env_python} {env_path / script["main"]} {script.get('args', '')}"
+    command = f"{env_python} {env_path / script["main"]} {script.get("args", "")}"
 
     try:
         print(
-            f"{Fore.MAGENTA}♻️  Running script in virtual environment:{Fore.LIGHTBLACK_EX} {script["main"]}{Style.RESET_ALL}"
+            f"{Fore.MAGENTA}♻️  Running script in virtual environment for {Fore.LIGHTBLACK_EX}{container_name}{Style.RESET_ALL}{Fore.MAGENTA}:{Fore.LIGHTBLACK_EX} {script["main"]}{Style.RESET_ALL}"
         )
         process = subprocess.Popen(
             command,
@@ -200,16 +229,16 @@ def run_script_in_virtualenv(script, path, container_name, env_path):
 
         if process.returncode != 0:
             print(
-                f"{Fore.RED}❌ Script failed {Fore.LIGHTBLACK_EX}{script["main"]}{Fore.RED}: {stderr.decode('utf-8')}{Style.RESET_ALL}"
+                f"{Fore.RED}❌ Script {Fore.LIGHTBLACK_EX}{script["main"]}{Fore.RED} failed in {Fore.LIGHTBLACK_EX}{container_name}{Fore.RED}: {stderr.decode("utf-8")}{Style.RESET_ALL}"
             )
             return False
         else:
             print(
-                f"{Fore.GREEN}✅ Script succeeded {Fore.LIGHTBLACK_EX}{script["main"]}{Style.RESET_ALL}"
+                f"{Fore.GREEN}✅ Script {Fore.LIGHTBLACK_EX}{script["main"]}{Fore.GREEN} ran successfully in {Fore.LIGHTBLACK_EX}{container_name}{Style.RESET_ALL}"
             )
     except Exception as e:
         print(
-            f"{Fore.RED}❌ Error running script {Fore.LIGHTBLACK_EX}{script['main']}{Fore.RED}: {e}{Style.RESET_ALL}"
+            f"{Fore.RED}❌ Error running script {Fore.LIGHTBLACK_EX}{script["main"]}{Fore.RED} in {Fore.LIGHTBLACK_EX}{container_name}{Fore.RED}: {e}{Style.RESET_ALL}"
         )
         return False
 
@@ -217,8 +246,9 @@ def run_script_in_virtualenv(script, path, container_name, env_path):
 
 
 def create_container(name, version, description, license, scripts):
-    if os.path.exists(f"{name}"): shutil.rmtree(f"{name}")
-    
+    if os.path.exists(f"{name}"):
+        shutil.rmtree(f"{name}")
+
     os.mkdir(f"{name}")
     os.mkdir(f"{name}/.daphne")
 
@@ -234,11 +264,28 @@ def create_container(name, version, description, license, scripts):
             f,
         )
 
-    with open(f"{name}/{scripts['start']['main']}", "w") as f:
+    with open(f"{name}/{scripts["start"]["main"]}", "w") as f:
         f.write("print('Hello World!')")
 
 
-def init_container(defaults=False):
+def init_container(defaults=False, template_path=None):
+    if template_path:
+        try:
+            with open(template_path, "r") as template_file:
+                template = json.load(template_file)
+                name = template["name"]
+                version = template["version"]
+                description = template["description"]
+                license = template["license"]
+                scripts = template["scripts"]
+                create_container(name, version, description, license, scripts)
+                print(
+                    f"{Fore.GREEN}✅ Container created from template.{Style.RESET_ALL}"
+                )
+                return
+        except Exception as e:
+            print(f"{Fore.RED}❌ Failed to load template: {e}{Style.RESET_ALL}")
+
     if defaults:
         name = "mycontainer"
         version = "1.0.0"
@@ -295,7 +342,6 @@ def load_json(filepath):
 if __name__ == "__main__":
     print("==============================================================")
     print(f"{Fore.CYAN}🟦 Daphene v{VERSION} 🟦{Style.RESET_ALL}")
-    print(f"{Fore.CYAN}🌏 Package Server: {PACKAGE_SERVER}{Style.RESET_ALL}")
     print("==============================================================")
 
     args = parse_arguments()
@@ -303,8 +349,8 @@ if __name__ == "__main__":
     if args.run:
         run(args.run)
     elif args.init:
-        init_container(args.defaults)
+        init_container(args.defaults, args.template)
+    elif args.list:
+        list_containers()
     else:
-        print(
-            f"{Fore.RED}❌ Please specify either {Fore.LIGHTBLACK_EX}--run{Style.RESET_ALL} or {Fore.LIGHTBLACK_EX}--init{Style.RESET_ALL}"
-        )
+        print(f"{Fore.RED}❌ Please specify an argument(s)!{Style.RESET_ALL}")
