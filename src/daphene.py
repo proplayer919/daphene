@@ -7,6 +7,7 @@ import subprocess
 import shutil
 from pathlib import Path
 import atexit
+import zipfile
 
 from colorama import Fore, Style
 
@@ -15,7 +16,7 @@ def register_cleanup(temp_dir):
     atexit.register(lambda: clean_temp_dir(temp_dir))
 
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 
 def parse_arguments():
@@ -104,8 +105,8 @@ def run_container(container, is_built=False, script="start"):
     try:
         metadata = load_json(f"{container}/.daphene/meta.json")
 
-        runs_on = metadata["scripts"][script].get("language", "python@latest")
-        env_path = prepare_virtualenv(runs_on, container)
+        language = metadata["scripts"][script].get("language", "python")
+        env_path = prepare_virtualenv(language, container)
 
         try:
             start_script = metadata["scripts"][script]
@@ -116,7 +117,7 @@ def run_container(container, is_built=False, script="start"):
             exit(1)
 
         if not run_script_in_virtualenv(
-            start_script, container, metadata["name"], env_path
+            start_script, container, metadata["name"], env_path, language
         ):
             print(
                 f"{Fore.RED}❌ Failed to run container {Fore.LIGHTBLACK_EX}{container}@{metadata["version"]}{Style.RESET_ALL}"
@@ -134,10 +135,10 @@ def run_container(container, is_built=False, script="start"):
     )
 
 
-def prepare_virtualenv(runs_on, container_dir):
-    if not runs_on.lower() == "python":
+def prepare_virtualenv(language, container_dir):
+    if not language.lower() in ["python", "node"]:
         print(
-            f"{Fore.RED}❌ Unsupported environment: {Fore.LIGHTBLACK_EX}{runs_on}{Style.RESET_ALL}"
+            f"{Fore.RED}❌ Unsupported environment: {Fore.LIGHTBLACK_EX}{language}{Style.RESET_ALL}"
         )
         exit(1)
 
@@ -146,16 +147,24 @@ def prepare_virtualenv(runs_on, container_dir):
 
     if env_path.exists():
         shutil.rmtree(env_path)
-    print(f"{Fore.BLUE}♻️  Creating virtual environment{Style.RESET_ALL}")
+    print(
+        f"{Fore.BLUE}♻️  Creating {"Python" if language == 'python' else "NodeJS"} virtual environment{Style.RESET_ALL}"
+    )
 
     try:
-        subprocess.run(
-            ["virtualenv", str(env_path)],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        # subprocess.run(
+        #     ["virtualenv", str(env_path)],
+        #     check=True,
+        #     stdout=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        # )
+
+        with zipfile.ZipFile(f"environments/{language}.zip", "r") as zip_ref:
+            zip_ref.extractall(env_path)
+
+        print(
+            f"{Fore.GREEN}✅ {"Python" if language == 'python' else "NodeJS"} virtual environment created{Style.RESET_ALL}"
         )
-        print(f"{Fore.GREEN}✅ Virtual environment created{Style.RESET_ALL}")
 
         subprocess.run(
             ["cp", "-r", f"{container_dir}/.", str(env_path)],
@@ -165,30 +174,43 @@ def prepare_virtualenv(runs_on, container_dir):
         )
     except Exception as e:
         print(
-            f"{Fore.RED}❌ Failed to create virtual environment: {e}{Style.RESET_ALL}"
+            f"{Fore.RED}❌ Failed to create {'Python' if language == 'python' else 'NodeJS'} virtual environment: {e}{Style.RESET_ALL}"
         )
         exit(1)
 
     return env_path
 
 
-def run_script_in_virtualenv(script, path, container_name, env_path):
-    env_bin = (
-        env_path / "Scripts" if platform.system() == "Windows" else env_path / "bin"
+def run_script_in_virtualenv(script, path, container_name, env_path, language):
+    env_executable = (
+        ("python.exe" if platform.system() == "Windows" else "python")
+        if language == "python"
+        else ("node.exe" if platform.system() == "Windows" else "node")
     )
-    env_python = (
-        env_bin / "python.exe" if platform.system() == "Windows" else env_bin / "python"
+
+    env_packagemanager = (
+        ("pip.exe" if platform.system() == "Windows" else "pip")
+        if language == "python"
+        else ("npm.exe" if platform.system() == "Windows" else "npm")
     )
-    env_pip = env_bin / "pip.exe" if platform.system() == "Windows" else env_bin / "pip"
 
     if os.path.exists(f"{path}/requirements.txt"):
         try:
-            subprocess.run(
-                [env_pip, "install", "-r", f"{path}/requirements.txt"],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
+            if language == "python":
+                subprocess.run(
+                    [env_packagemanager, "install", "-r", f"{path}/requirements.txt"],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+            else:
+                subprocess.run(
+                    [env_packagemanager, "install"],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                )
+
             print(
                 f"{Fore.GREEN}✅ Installed dependencies in virtual environment for {Fore.LIGHTBLACK_EX}{container_name}{Style.RESET_ALL}"
             )
@@ -200,7 +222,7 @@ def run_script_in_virtualenv(script, path, container_name, env_path):
 
     os.chdir(env_path)
 
-    command = f"{env_python} {env_path / script["main"]} {script.get("args", "")}"
+    command = f"{env_executable} {env_path / script["main"]} {script.get("args", "")}"
 
     try:
         print(
@@ -265,8 +287,13 @@ def create_container(name, version, description, license, scripts):
             f,
         )
 
+    default_code = {
+        "python": "print('Hello World!')",
+        "node": "console.log('Hello World!')",
+    }
+
     with open(f"{name}/{scripts["start"]["main"]}", "w") as f:
-        f.write("print('Hello World!')")
+        f.write(default_code.get(scripts["start"]["language"], "Your code here."))
 
 
 def init_container(defaults=False, template_path=None):
@@ -315,22 +342,14 @@ def init_container(defaults=False, template_path=None):
             input(f"{Fore.MAGENTA}📦 Container license (MIT):{Style.RESET_ALL} ")
             or "MIT"
         )
-        scripts = {
-            "start": {
-                "language": (
-                    input(
-                        f"{Fore.MAGENTA}📦 Container language (python):{Style.RESET_ALL} "
-                    )
-                    or "python"
-                ),
-                "main": (
-                    input(
-                        f"{Fore.MAGENTA}📦 Container main file (main.py):{Style.RESET_ALL} "
-                    )
-                    or "main.py"
-                ),
-            }
-        }
+        language = (
+            input(f"{Fore.MAGENTA}📦 Container language (python):{Style.RESET_ALL} ")
+            or "python"
+        )
+        main = input(
+            f"{Fore.MAGENTA}📦 Container main file ({"main.py" if language.lower() == "python" else "index.js"}):{Style.RESET_ALL} "
+        ) or ("main.py" if language.lower() == "python" else "index.js")
+        scripts = {"start": {"language": language, "main": main}}
 
     create_container(name, version, description, license, scripts)
 

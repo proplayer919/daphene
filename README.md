@@ -6,7 +6,7 @@ Daphene is a containerized script management tool designed for running isolated 
 
 - Initialize containers with metadata and scripts.
 - Run scripts inside isolated environments.
-- Support for Python virtual environments.
+- Support for Python and NodeJS virtual environments.
 - Clean up temporary directories created during execution.
 - Customizable container metadata with JSON configuration.
 - CLI arguments for flexibility.
@@ -30,13 +30,12 @@ Daphene is a containerized script management tool designed for running isolated 
 ### Prerequisites
 
 - Python 3.8 or later.
-- `virtualenv` package.
 - `colorama` package for colored output.
 
 Install dependencies with:
 
 ```bash
-pip install virtualenv colorama
+pip install colorama
 ```
 
 ---
@@ -97,9 +96,9 @@ python daphene.py --list
 
 ### Error: Failed to Create Virtual Environment
 
-**Cause**: Missing or incorrectly installed `virtualenv` package.
+**Cause**: Missing or incorrectly installed environment packages.
 
-**Solution**: Reinstall the `virtualenv` package using `pip install virtualenv`.
+**Solution**: Reinstall the environment packages from the GitHub repository.
 
 ### Error: No Such Script in Container
 
