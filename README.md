@@ -105,7 +105,7 @@ python daphene.py --list
 
 **Cause**: The specified script does not exist in the container metadata.
 
-**Solution**: Verify the script name in the container's `.daphne/meta.json` file and ensure the file path is correct.
+**Solution**: Verify the script name in the container's `.daphene/meta.json` file and ensure the file path is correct.
 
 ---
 

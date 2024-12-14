@@ -60,7 +60,7 @@ def list_containers(base_dir="."):
         d
         for d in os.listdir(base_dir)
         if os.path.isdir(os.path.join(base_dir, d))
-        and os.path.exists(os.path.join(base_dir, d, ".daphne", "meta.json"))
+        and os.path.exists(os.path.join(base_dir, d, ".daphene", "meta.json"))
     ]
     if containers:
         print(f"{Fore.GREEN}Available containers:{Style.RESET_ALL}")
@@ -102,9 +102,9 @@ def run_container(container, is_built=False, script="start"):
         )
 
     try:
-        metadata = load_json(f"{container}/.daphne/meta.json")
+        metadata = load_json(f"{container}/.daphene/meta.json")
 
-        runs_on = metadata["scripts"][script].get("runsOn", "python@latest")
+        runs_on = metadata["scripts"][script].get("language", "python@latest")
         env_path = prepare_virtualenv(runs_on, container)
 
         try:
@@ -250,11 +250,12 @@ def create_container(name, version, description, license, scripts):
         shutil.rmtree(f"{name}")
 
     os.mkdir(f"{name}")
-    os.mkdir(f"{name}/.daphne")
+    os.mkdir(f"{name}/.daphene")
 
-    with open(f"{name}/.daphne/meta.json", "w") as f:
+    with open(f"{name}/.daphene/meta.json", "w") as f:
         json.dump(
             {
+                "$schema": "https://github.com/proplayer919/daphene/blob/main/container.schema.json",
                 "name": name,
                 "version": version,
                 "description": description,
@@ -293,7 +294,7 @@ def init_container(defaults=False, template_path=None):
         license = "MIT"
         scripts = {
             "start": {
-                "runsOn": "python",
+                "language": "python",
                 "main": "main.py",
             }
         }
@@ -316,7 +317,7 @@ def init_container(defaults=False, template_path=None):
         )
         scripts = {
             "start": {
-                "runsOn": (
+                "language": (
                     input(
                         f"{Fore.MAGENTA}📦 Container language (python):{Style.RESET_ALL} "
                     )
