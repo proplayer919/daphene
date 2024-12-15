@@ -96,9 +96,9 @@ python daphene.py --list
 
 ### Error: Failed to Create Virtual Environment
 
-**Cause**: Missing or incorrectly installed environment packages.
+**Cause**: Missing or incorrectly installed runtimes.
 
-**Solution**: Reinstall the environment packages from the GitHub repository.
+**Solution**: Reinstall the runtimes from the GitHub repository.
 
 ### Error: No Such Script in Container
 

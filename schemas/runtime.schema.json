@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/proplayer919/daphene/raw/refs/heads/main/schemas/runtime.schema.json",
+    "title": "Daphene Runtime",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "executables": {
+            "type": "object",
+            "properties": {
+                "exec": {
+                    "type": "string"
+                },
+                "packagemanager": {
+                    "type": "string"
+                }
+            }
+        },
+        "required": [
+            "name",
+            "version",
+            "description",
+            "license",
+            "executables"
+        ]
+    }
+}

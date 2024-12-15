@@ -12,11 +12,21 @@ import zipfile
 from colorama import Fore, Style
 
 
+VERSION = "1.3.0"
+
+
 def register_cleanup(temp_dir):
     atexit.register(lambda: clean_temp_dir(temp_dir))
 
 
-VERSION = "1.2.0"
+def printerror(message):
+    print(f"{Fore.RED}❌ {message}{Style.RESET_ALL}")
+    
+def printwarning(message):
+    print(f"{Fore.YELLOW}⚠️  {message}{Style.RESET_ALL}")
+    
+def printsuccess(message):
+    print(f"{Fore.GREEN}✅ {message}{Style.RESET_ALL}")
 
 
 def parse_arguments():
@@ -53,6 +63,7 @@ def get_temp_dir():
         print(
             f"{Fore.RED}❌ Unsupported platform: {Fore.LIGHTBLACK_EX}{platform_name}{Style.RESET_ALL}"
         )
+        printerror(f"Unsupported platform: {Fore.LIGHTBLACK_EX}{platform_name}")
         exit(1)
 
 
@@ -105,11 +116,11 @@ def run_container(container, is_built=False, script="start"):
     try:
         metadata = load_json(f"{container}/.daphene/meta.json")
 
-        language = metadata["scripts"][script].get("language", "python")
-        env_path = prepare_virtualenv(language, container)
+        runtime = metadata["scripts"][script].get("runtime")
+        env_path, runtime_meta = prepare_virtualenv(runtime, container)
 
         try:
-            start_script = metadata["scripts"][script]
+            script = metadata["scripts"][script]
         except KeyError:
             print(
                 f"{Fore.RED}❌ No such script {Fore.LIGHTBLACK_EX}{script}{Style.RESET_ALL} in container {Fore.LIGHTBLACK_EX}{container}@{metadata["version"]}{Style.RESET_ALL}"
@@ -117,7 +128,7 @@ def run_container(container, is_built=False, script="start"):
             exit(1)
 
         if not run_script_in_virtualenv(
-            start_script, container, metadata["name"], env_path, language
+            script, container, metadata["name"], env_path, runtime, runtime_meta
         ):
             print(
                 f"{Fore.RED}❌ Failed to run container {Fore.LIGHTBLACK_EX}{container}@{metadata["version"]}{Style.RESET_ALL}"
@@ -135,35 +146,28 @@ def run_container(container, is_built=False, script="start"):
     )
 
 
-def prepare_virtualenv(language, container_dir):
-    if not language.lower() in ["python", "node"]:
+def prepare_virtualenv(runtime, container_dir):
+    if not (runtime.lower() + ".zip") in os.listdir("runtimes"):
         print(
-            f"{Fore.RED}❌ Unsupported environment: {Fore.LIGHTBLACK_EX}{language}{Style.RESET_ALL}"
+            f"{Fore.RED}❌ Unsupported runtime: {Fore.LIGHTBLACK_EX}{runtime}{Style.RESET_ALL}"
         )
         exit(1)
 
     env_path = Path(get_temp_dir())
     register_cleanup(env_path)
 
+    extract_zip(f"runtimes/{runtime}.zip", env_path / "runtime")
+    runtime_meta = load_json(env_path / "runtime" / ".daphene" / "meta.json")
+
     if env_path.exists():
         shutil.rmtree(env_path)
     print(
-        f"{Fore.BLUE}♻️  Creating {"Python" if language == 'python' else "NodeJS"} virtual environment{Style.RESET_ALL}"
+        f"{Fore.BLUE}♻️  Creating {runtime_meta["name"]} virtual environment{Style.RESET_ALL}"
     )
 
     try:
-        # subprocess.run(
-        #     ["virtualenv", str(env_path)],
-        #     check=True,
-        #     stdout=subprocess.PIPE,
-        #     stderr=subprocess.PIPE,
-        # )
-
-        with zipfile.ZipFile(f"environments/{language}.zip", "r") as zip_ref:
-            zip_ref.extractall(env_path)
-
         print(
-            f"{Fore.GREEN}✅ {"Python" if language == 'python' else "NodeJS"} virtual environment created{Style.RESET_ALL}"
+            f"{Fore.GREEN}✅ {"Python" if runtime == 'python' else "NodeJS"} virtual environment created{Style.RESET_ALL}"
         )
 
         subprocess.run(
@@ -174,42 +178,44 @@ def prepare_virtualenv(language, container_dir):
         )
     except Exception as e:
         print(
-            f"{Fore.RED}❌ Failed to create {'Python' if language == 'python' else 'NodeJS'} virtual environment: {e}{Style.RESET_ALL}"
+            f"{Fore.RED}❌ Failed to create {'Python' if runtime == 'python' else 'NodeJS'} virtual environment: {e}{Style.RESET_ALL}"
         )
         exit(1)
 
-    return env_path
+    return env_path, runtime_meta
 
 
-def run_script_in_virtualenv(script, path, container_name, env_path, language):
-    env_executable = (
-        ("python.exe" if platform.system() == "Windows" else "python")
-        if language == "python"
-        else ("node.exe" if platform.system() == "Windows" else "node")
-    )
+def run_script_in_virtualenv(
+    script, path, container_name, env_path, runtime, runtime_meta
+):
+    env_executable = runtime_meta["executables"]["exec"]
+    env_packagemanager = runtime_meta["executables"]["packagemanager"]
 
-    env_packagemanager = (
-        ("pip.exe" if platform.system() == "Windows" else "pip")
-        if language == "python"
-        else ("npm.exe" if platform.system() == "Windows" else "npm")
-    )
-
-    if os.path.exists(f"{path}/requirements.txt"):
+    if os.path.exists(f"{path}/requirements.txt") and runtime == "python":
         try:
-            if language == "python":
-                subprocess.run(
-                    [env_packagemanager, "install", "-r", f"{path}/requirements.txt"],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-            else:
-                subprocess.run(
-                    [env_packagemanager, "install"],
-                    check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
+            subprocess.run(
+                [env_packagemanager, "install", "-r", f"{path}/requirements.txt"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+            print(
+                f"{Fore.GREEN}✅ Installed dependencies in virtual environment for {Fore.LIGHTBLACK_EX}{container_name}{Style.RESET_ALL}"
+            )
+        except Exception as e:
+            print(
+                f"{Fore.RED}❌ Failed to install dependencies in virtual environment for {Fore.LIGHTBLACK_EX}{container_name}{Fore.RED}: {e}{Style.RESET_ALL}"
+            )
+            exit(1)
+    elif os.path.exists(f"{path}/package.json") and runtime == "nodejs":
+        try:
+            subprocess.run(
+                [env_packagemanager, "install"],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
 
             print(
                 f"{Fore.GREEN}✅ Installed dependencies in virtual environment for {Fore.LIGHTBLACK_EX}{container_name}{Style.RESET_ALL}"
@@ -293,7 +299,7 @@ def create_container(name, version, description, license, scripts):
     }
 
     with open(f"{name}/{scripts["start"]["main"]}", "w") as f:
-        f.write(default_code.get(scripts["start"]["language"], "Your code here."))
+        f.write(default_code.get(scripts["start"]["runtime"], "Your code here."))
 
 
 def init_container(defaults=False, template_path=None):
@@ -321,7 +327,7 @@ def init_container(defaults=False, template_path=None):
         license = "MIT"
         scripts = {
             "start": {
-                "language": "python",
+                "runtime": "python",
                 "main": "main.py",
             }
         }
@@ -342,14 +348,14 @@ def init_container(defaults=False, template_path=None):
             input(f"{Fore.MAGENTA}📦 Container license (MIT):{Style.RESET_ALL} ")
             or "MIT"
         )
-        language = (
-            input(f"{Fore.MAGENTA}📦 Container language (python):{Style.RESET_ALL} ")
+        runtime = (
+            input(f"{Fore.MAGENTA}📦 Container runtime (python):{Style.RESET_ALL} ")
             or "python"
         )
         main = input(
-            f"{Fore.MAGENTA}📦 Container main file ({"main.py" if language.lower() == "python" else "index.js"}):{Style.RESET_ALL} "
-        ) or ("main.py" if language.lower() == "python" else "index.js")
-        scripts = {"start": {"language": language, "main": main}}
+            f"{Fore.MAGENTA}📦 Container main file ({"main.py" if runtime.lower() == "python" else "index.js"}):{Style.RESET_ALL} "
+        ) or ("main.py" if runtime.lower() == "python" else "index.js")
+        scripts = {"start": {"runtime": runtime, "main": main}}
 
     create_container(name, version, description, license, scripts)
 
@@ -357,6 +363,11 @@ def init_container(defaults=False, template_path=None):
 def load_json(filepath):
     with open(filepath) as f:
         return json.load(f)
+
+
+def extract_zip(zip_path, extract_path):
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        zip_ref.extractall(extract_path)
 
 
 if __name__ == "__main__":

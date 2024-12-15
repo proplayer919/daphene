@@ -1,0 +1,47 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/proplayer919/daphene/raw/refs/heads/main/schemas/container.schema.json",
+    "title": "Daphene Container",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "version": {
+            "type": "string"
+        },
+        "description": {
+            "type": "string"
+        },
+        "license": {
+            "type": "string"
+        },
+        "scripts": {
+            "type": "object",
+            "properties": {
+                "start": {
+                    "type": "object",
+                    "properties": {
+                        "runtime": {
+                            "type": "string"
+                        },
+                        "main": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "runtime",
+                        "main"
+                    ]
+                }
+            }
+        },
+        "required": [
+            "name",
+            "version",
+            "description",
+            "license",
+            "scripts"
+        ]
+    }
+}
