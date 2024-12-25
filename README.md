@@ -31,21 +31,22 @@ Daphene is a containerized script management tool designed for running isolated 
 
 - Python 3.8 or later.
 - `colorama` package for colored output.
+- `flask` package for static file serving.
 
 Install dependencies with:
 
 ```bash
-pip install colorama
+pip install -r requirements.txt
 ```
 
 ---
 
 ## Usage
 
-Run Daphene using the following command:
+Run Daphene using the following command (assuming you are currently in the Daphene's root directory):
 
 ```bash
-python daphene.py [OPTIONS]
+python src/daphene.py [OPTIONS]
 ```
 
 ---

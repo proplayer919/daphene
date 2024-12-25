@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Container Error</title>
+
+        <style>
+            html {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            }
+
+            svg {
+                width: auto;
+                height: 14px;
+                overflow: hidden;
+                border: none;
+                vertical-align: middle;
+            }
+
+            .dot {
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                border-radius: 5px;
+                margin-right: 4px;
+            }
+
+            .green-dot {
+                background-color: #98ec65;
+            }
+
+            nav {
+                flex: 1;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-right: 8px;
+            }
+
+            .error-block {
+                white-space: pre-wrap;
+                word-break: break-word;
+                font-family: monospace;
+                padding: 8px 16px;
+                border-left: 2px solid #ff5555;
+                border-radius: 4px;
+                margin-top: 8px;
+                font-weight: bold;
+                color: #ff5555;
+                background-color: #2a1e1e;
+                margin-bottom: 16px;
+            }
+
+            small {
+                color: #808080;
+                margin: 0;
+                margin-top: 4px;
+            }
+
+            small, span {
+                -webkit-user-select: none;
+                user-select: none;
+            }
+
+            .title-wrapper {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            .title {
+                font-size: 20px;
+                -webkit-user-select: none;
+                user-select: none;
+                margin: 0;
+            }
+
+            .icon-button {
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 32px;
+                height: 32px;
+                margin-left: 8px;
+            }
+
+            body {
+                background-color: #2c2c2e;
+                color: #fff;
+                margin: 0;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                font-size: 14px;
+                line-height: 1.5;
+                overflow-wrap: break-word;
+            }
+
+            .container {
+                padding: 20px 16px;
+                background-color: #1c1c1e;
+                box-sizing: border-box;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+                border-radius: 10px;
+                border-top: 5px solid #ff5555;
+
+                display: flex;
+                flex-direction: column;
+
+                margin: auto;
+                max-width: 600px;
+                min-height: fit-content;
+
+                overflow: auto;
+            }
+
+            .help-link {
+                color: #fff;
+                text-decoration: none;
+            }
+
+            .icon-buttons {
+                display: flex;
+            }
+
+            /* Responsive styles */
+            @media (max-width: 768px) {
+                .container {
+                    max-width: 90%;
+                    padding: 16px;
+                }
+
+                .title {
+                    font-size: 18px;
+                }
+
+                .dot {
+                    width: 8px;
+                    height: 8px;
+                }
+
+                nav {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+
+                .controls {
+                    margin-right: 0;
+                    margin-top: 8px;
+                }
+            }
+
+            @media (max-width: 480px) {
+                body {
+                    font-size: 12px;
+                }
+
+                .title {
+                    font-size: 16px;
+                }
+
+                .container {
+                    padding: 12px;
+                }
+
+                .icon-button {
+                    width: 28px;
+                    height: 28px;
+                }
+            }
+        </style>
+
+        <script src="https://kit.fontawesome.com/ac9ab6562b.js" crossorigin="anonymous"></script>
+    </head>
+
+    <body>
+        <div class="container">
+            <div class="header">
+                <nav>
+                    <span>
+                        <span class="dot green-dot"></span>
+                        <small>Daphene Engine (1.4.0)</small>
+                    </span>
+                </nav>
+            </div>
+            <div class="header">
+                <nav>
+                    <div class="title-wrapper">
+                        <h1 class="title">Container Error ({STATUS_CODE})</h1>
+                        <div class="icon-buttons">
+                            <div class="icon-button">
+                                <div class="copy">
+                                    <i class="fa-regular fa-copy" id="copy"></i>
+                                    <i class="fa-solid fa-check" id="check" style="display: none; color: #98ec65;"></i>
+                                </div>
+                            </div>
+                            <div class="icon-button">
+                                <div class="help">
+                                    <a href="https://github.com/daphene-ai/daphene" class="help-link">
+                                        <i class="fa-solid fa-question"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+            <div class="error-block" id="error-block">{ERROR}</div>
+            <small>This error happened while generating the page. Any console logs will be displayed in the
+                terminal.</small>
+        </div>
+
+        <script>
+            const copy = document.getElementById('copy');
+            const check = document.getElementById('check');
+            const errorBlock = document.getElementById('error-block');
+
+            copy.addEventListener('click', () => {
+                navigator.clipboard.writeText(errorBlock.innerText);
+                copy.style.display = 'none';
+                check.style.display = 'block';
+                setTimeout(() => {
+                    copy.style.display = 'block';
+                    check.style.display = 'none';
+                }, 1000);
+            });
+        </script>
+    </body>
+
+</html>
